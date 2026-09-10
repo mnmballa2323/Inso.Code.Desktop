@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 
 async function main() {
-  const logoPath = '../Inso.Code.Frontend/public/inso-logo-white.png';
+  const logoPath = '../Inso.Code.Frontend/public/inso-agent-logo.png';
   const outPath = './base-icon.png';
   const size = 1024;
   const radius = 230;
