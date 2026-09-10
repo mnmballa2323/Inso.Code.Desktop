@@ -561,6 +561,223 @@ async fn capture_window_native(_window_name: Option<String>) -> Result<String, S
     capture_screen_native().await
 }
 
+#[tauri::command]
+async fn inject_mouse_double_click(x: f64, y: f64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"tell application "System Events"
+                click at {{{}, {}}}
+                click at {{{}, {}}}
+            end tell"#,
+            x as i64, y as i64, x as i64, y as i64
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("🖱️ [ComputerUse] Mouse Double Click: ({}, {})", x, y);
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_mouse_triple_click(x: f64, y: f64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"tell application "System Events"
+                click at {{{}, {}}}
+                click at {{{}, {}}}
+                click at {{{}, {}}}
+            end tell"#,
+            x as i64, y as i64, x as i64, y as i64, x as i64, y as i64
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("🖱️ [ComputerUse] Mouse Triple Click: ({}, {})", x, y);
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_mouse_drag(start_x: f64, start_y: f64, end_x: f64, end_y: f64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"do shell script "python3 -c 'import pyautogui; pyautogui.moveTo({}, {}); pyautogui.dragTo({}, {}, duration=0.4, button=\"left\")' 2>/dev/null || true""#,
+            start_x as i64, start_y as i64, end_x as i64, end_y as i64
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("🖱️ [ComputerUse] Mouse Drag: ({}, {}) -> ({}, {})", start_x, start_y, end_x, end_y);
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_mouse_scroll(delta_x: f64, delta_y: f64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"do shell script "python3 -c 'import pyautogui; pyautogui.scroll({})' 2>/dev/null || true""#,
+            delta_y as i64
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("🖱️ [ComputerUse] Mouse Scroll: dx={}, dy={}", delta_x, delta_y);
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_mouse_down(button: Option<String>) -> Result<(), String> {
+    let btn = button.unwrap_or_else(|| "left".to_string());
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"do shell script "python3 -c 'import pyautogui; pyautogui.mouseDown(button=\"{}\")' 2>/dev/null || true""#,
+            btn
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("🖱️ [ComputerUse] Mouse Down: button={}", btn);
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_mouse_up(button: Option<String>) -> Result<(), String> {
+    let btn = button.unwrap_or_else(|| "left".to_string());
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"do shell script "python3 -c 'import pyautogui; pyautogui.mouseUp(button=\"{}\")' 2>/dev/null || true""#,
+            btn
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("🖱️ [ComputerUse] Mouse Up: button={}", btn);
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_hotkey_combination(modifiers: Vec<String>, key: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut mods_syntax = Vec::new();
+        for m in &modifiers {
+            match m.to_lowercase().as_str() {
+                "command" | "cmd" => mods_syntax.push("command down"),
+                "shift" => mods_syntax.push("shift down"),
+                "control" | "ctrl" => mods_syntax.push("control down"),
+                "option" | "alt" => mods_syntax.push("option down"),
+                _ => {}
+            }
+        }
+
+        let using_clause = if !mods_syntax.is_empty() {
+            format!(" using {{{}}}", mods_syntax.join(", "))
+        } else {
+            "".to_string()
+        };
+
+        let script = format!(
+            r#"tell application "System Events" to keystroke "{}"{}"#,
+            key.replace('\\', "\\\\").replace('"', "\\\""),
+            using_clause
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("⌨️ [ComputerUse] Hotkey Combination: {:?} + {}", modifiers, key);
+    Ok(())
+}
+
+#[tauri::command]
+async fn read_clipboard_native() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(out) = Command::new("pbpaste").output() {
+            return Ok(String::from_utf8_lossy(&out.stdout).to_string());
+        }
+    }
+    Ok("".to_string())
+}
+
+#[tauri::command]
+async fn write_clipboard_native(text: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::io::Write;
+        if let Ok(mut child) = Command::new("pbcopy").stdin(Stdio::piped()).spawn() {
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = stdin.write_all(text.as_bytes());
+            }
+            let _ = child.wait();
+        }
+    }
+    println!("📋 [ComputerUse] Clipboard written: {} characters", text.len());
+    Ok(())
+}
+
+#[tauri::command]
+async fn capture_screen_region(x: f64, y: f64, width: f64, height: f64) -> Result<String, String> {
+    let tmp_path = std::env::temp_dir().join("inso_region_capture.png");
+    let tmp_str = tmp_path.to_string_lossy().to_string();
+
+    #[cfg(target_os = "macos")]
+    {
+        let region_arg = format!("-R{},{},{},{}", x as i64, y as i64, width as i64, height as i64);
+        let status = Command::new("/usr/sbin/screencapture")
+            .args(&["-x", &region_arg, &tmp_str])
+            .status()
+            .map_err(|e| format!("screencapture region failed: {}", e))?;
+
+        if !status.success() {
+            return Err("screencapture region returned non-zero exit code".into());
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        return capture_screen_native().await;
+    }
+
+    if tmp_path.exists() {
+        let bytes = fs::read(&tmp_path).map_err(|e| format!("Failed to read captured image: {}", e))?;
+        let _ = fs::remove_file(&tmp_path);
+        Ok(base64_standard.encode(bytes))
+    } else {
+        Err("Region capture file was not generated".into())
+    }
+}
+
+#[tauri::command]
+async fn inspect_accessibility_tree(app_name: Option<String>) -> Result<Vec<serde_json::Value>, String> {
+    let mut elements = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app_name;
+        let script = r#"
+            tell application "System Events"
+                set frontApp to first application process whose frontmost is true
+                set appName to name of frontApp
+                set winTitle to ""
+                try
+                    set winTitle to name of front window of frontApp
+                end try
+                return appName & "|||" & winTitle
+            end tell
+        "#;
+        if let Ok(out) = Command::new("osascript").args(&["-e", script]).output() {
+            let res = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let parts: Vec<&str> = res.split("|||").collect();
+            elements.push(serde_json::json!({
+                "type": "window",
+                "app": parts.get(0).unwrap_or(&"Unknown"),
+                "title": parts.get(1).unwrap_or(&""),
+                "focused": true
+            }));
+        }
+    }
+
+    Ok(elements)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -590,7 +807,18 @@ fn main() {
             get_screen_geometry,
             focus_application_window,
             get_system_running_processes,
-            capture_window_native
+            capture_window_native,
+            inject_mouse_double_click,
+            inject_mouse_triple_click,
+            inject_mouse_drag,
+            inject_mouse_scroll,
+            inject_mouse_down,
+            inject_mouse_up,
+            inject_hotkey_combination,
+            read_clipboard_native,
+            write_clipboard_native,
+            capture_screen_region,
+            inspect_accessibility_tree
         ])
         .setup(|app| {
             let initial_cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
