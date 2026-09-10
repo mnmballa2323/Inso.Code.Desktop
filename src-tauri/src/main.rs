@@ -1,14 +1,21 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::Manager;
-use std::process::Command;
+use tauri::{Manager, Emitter};
+use std::process::{Command, Stdio};
 use std::fs;
+use std::sync::Mutex;
+use std::path::PathBuf;
+use std::io::{BufRead, BufReader};
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as base64_standard};
+
+pub struct TerminalSessionState {
+    pub cwd: Mutex<PathBuf>,
+}
 
 /**
  * Inso Agent Desktop — Enterprise Rust OS Bridge & Cryptography Enclave.
@@ -257,6 +264,200 @@ async fn get_system_health() -> Result<serde_json::Value, String> {
     }))
 }
 
+#[tauri::command]
+async fn get_terminal_cwd(state: tauri::State<'_, TerminalSessionState>) -> Result<String, String> {
+    let cwd = state.cwd.lock().unwrap();
+    Ok(cwd.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn execute_os_command_stream(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, TerminalSessionState>,
+    command_id: String,
+    command_line: String,
+) -> Result<(), String> {
+    let current_cwd = {
+        let guard = state.cwd.lock().unwrap();
+        guard.clone()
+    };
+
+    let trimmed = command_line.trim();
+
+    // Built-in directory change handling
+    if trimmed.starts_with("cd ") || trimmed == "cd" {
+        let target = if trimmed == "cd" {
+            std::env::var("HOME").unwrap_or_else(|_| "/".into())
+        } else {
+            trimmed[3..].trim().to_string()
+        };
+
+        let new_path = if target.starts_with('/') || (cfg!(windows) && target.len() > 1 && target.chars().nth(1) == Some(':')) {
+            PathBuf::from(target.clone())
+        } else if target.starts_with('~') {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
+            PathBuf::from(target.replacen('~', &home, 1))
+        } else {
+            current_cwd.join(target.clone())
+        };
+
+        if new_path.exists() && new_path.is_dir() {
+            if let Ok(canonical) = new_path.canonicalize() {
+                let mut guard = state.cwd.lock().unwrap();
+                *guard = canonical.clone();
+                let _ = app.emit("terminal-stdout", serde_json::json!({
+                    "id": command_id,
+                    "data": format!("Changed directory to {}\n", canonical.display())
+                }));
+            } else {
+                let mut guard = state.cwd.lock().unwrap();
+                *guard = new_path.clone();
+            }
+            let _ = app.emit("terminal-exit", serde_json::json!({
+                "id": command_id,
+                "code": 0
+            }));
+            return Ok(());
+        } else {
+            let _ = app.emit("terminal-stderr", serde_json::json!({
+                "id": command_id,
+                "data": format!("cd: no such file or directory: {}\n", target)
+            }));
+            let _ = app.emit("terminal-exit", serde_json::json!({
+                "id": command_id,
+                "code": 1
+            }));
+            return Ok(());
+        }
+    }
+
+    let (shell, flag) = if cfg!(windows) {
+        ("cmd.exe", "/C")
+    } else {
+        ("/bin/sh", "-c")
+    };
+
+    let mut child = Command::new(shell)
+        .arg(flag)
+        .arg(&command_line)
+        .current_dir(&current_cwd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn shell process: {}", e))?;
+
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+
+    let app_clone1 = app.clone();
+    let cmd_id1 = command_id.clone();
+    let t1 = std::thread::spawn(move || {
+        if let Some(out) = stdout {
+            let reader = BufReader::new(out);
+            for line in reader.lines() {
+                if let Ok(l) = line {
+                    let _ = app_clone1.emit("terminal-stdout", serde_json::json!({
+                        "id": cmd_id1,
+                        "data": format!("{}\n", l)
+                    }));
+                }
+            }
+        }
+    });
+
+    let app_clone2 = app.clone();
+    let cmd_id2 = command_id.clone();
+    let t2 = std::thread::spawn(move || {
+        if let Some(err) = stderr {
+            let reader = BufReader::new(err);
+            for line in reader.lines() {
+                if let Ok(l) = line {
+                    let _ = app_clone2.emit("terminal-stderr", serde_json::json!({
+                        "id": cmd_id2,
+                        "data": format!("{}\n", l)
+                    }));
+                }
+            }
+        }
+    });
+
+    let status = child.wait().map_err(|e| format!("Process execution error: {}", e))?;
+    let _ = t1.join();
+    let _ = t2.join();
+
+    let exit_code = status.code().unwrap_or(1);
+    let _ = app.emit("terminal-exit", serde_json::json!({
+        "id": command_id,
+        "code": exit_code
+    }));
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_mouse_move(x: f64, y: f64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"do shell script "python3 -c 'import pyautogui; pyautogui.moveTo({}, {})' 2>/dev/null || true""#,
+            x as i64, y as i64
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("🖱️ [ComputerUse] Mouse Move: ({}, {})", x, y);
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_mouse_click(x: f64, y: f64, button: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let btn = button.unwrap_or_else(|| "left".to_string());
+        println!("🖱️ [ComputerUse] Mouse Click: ({}, {}) button={}", x, y, btn);
+        let script = format!(
+            r#"tell application "System Events" to click at {{{}, {}}}"#,
+            x as i64, y as i64
+        );
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_keyboard_type(text: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+        let script = format!(r#"tell application "System Events" to keystroke "{}""#, escaped);
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("⌨️ [ComputerUse] Keystroke Text: '{}'", text);
+    Ok(())
+}
+
+#[tauri::command]
+async fn inject_keyboard_key(key: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let key_code = match key.to_lowercase().as_str() {
+            "return" | "enter" => "key code 36",
+            "tab" => "key code 48",
+            "space" => "key code 49",
+            "escape" => "key code 53",
+            "backspace" | "delete" => "key code 51",
+            "up" => "key code 126",
+            "down" => "key code 125",
+            "left" => "key code 123",
+            "right" => "key code 124",
+            _ => "key code 36",
+        };
+        let script = format!(r#"tell application "System Events" to {}"#, key_code);
+        let _ = Command::new("osascript").args(&["-e", &script]).output();
+    }
+    println!("⌨️ [ComputerUse] Key Press: {}", key);
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -276,9 +477,20 @@ fn main() {
             capture_screen_native,
             get_active_app_context,
             trigger_native_notification,
-            get_system_health
+            get_system_health,
+            get_terminal_cwd,
+            execute_os_command_stream,
+            inject_mouse_move,
+            inject_mouse_click,
+            inject_keyboard_type,
+            inject_keyboard_key
         ])
         .setup(|app| {
+            let initial_cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
+            app.manage(TerminalSessionState {
+                cwd: Mutex::new(initial_cwd),
+            });
+
             // Auto-set dev session cookie for desktop app (dev mode only)
             #[cfg(debug_assertions)]
             {
