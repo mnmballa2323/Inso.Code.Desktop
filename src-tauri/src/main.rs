@@ -458,6 +458,109 @@ async fn inject_keyboard_key(key: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn get_screen_geometry(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    // Collect primary monitor bounds and scale factor for Computer Use calibration
+    if let Ok(Some(monitor)) = app.primary_monitor() {
+        let size = monitor.size();
+        let scale = monitor.scale_factor();
+        return Ok(serde_json::json!({
+            "width": size.width,
+            "height": size.height,
+            "scale_factor": scale,
+            "logical_width": (size.width as f64) / scale,
+            "logical_height": (size.height as f64) / scale,
+        }));
+    }
+
+    Ok(serde_json::json!({
+        "width": 1920,
+        "height": 1080,
+        "scale_factor": 1.0,
+        "logical_width": 1920.0,
+        "logical_height": 1080.0,
+    }))
+}
+
+#[tauri::command]
+async fn focus_application_window(app_name: String) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let escaped = app_name.replace('\\', "\\\\").replace('"', "\\\"");
+        let script = format!(
+            r#"tell application "{}" to activate"#,
+            escaped
+        );
+        let out = Command::new("osascript").args(&["-e", &script]).output();
+        if let Ok(o) = out {
+            if o.status.success() {
+                println!("🎯 [ComputerUse] Focused application '{}'", app_name);
+                return Ok(true);
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let script = format!(
+            r#"$w = (Get-Process -Name '{}' -ErrorAction SilentlyContinue | Select-Object -First 1).MainWindowHandle; if ($w) {{ (Add-Type '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);' -Name W -PassThru)::SetForegroundWindow($w) }}"#,
+            app_name.replace("'", "")
+        );
+        let _ = Command::new("powershell").args(&["-NoProfile", "-Command", &script]).output();
+        return Ok(true);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = Command::new("wmctrl").args(&["-a", &app_name]).output();
+        return Ok(true);
+    }
+
+    Ok(true)
+}
+
+#[tauri::command]
+async fn get_system_running_processes() -> Result<Vec<serde_json::Value>, String> {
+    let mut procs = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        let script = r#"
+            tell application "System Events"
+                set procList to {}
+                repeat with p in (every process whose visible is true)
+                    set end of procList to (name of p)
+                end repeat
+                return procList
+            end tell
+        "#;
+        if let Ok(out) = Command::new("osascript").args(&["-e", script]).output() {
+            let res = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            for name in res.split(", ") {
+                let trimmed = name.trim();
+                if !trimmed.is_empty() {
+                    procs.push(serde_json::json!({
+                        "name": trimmed,
+                        "visible": true,
+                    }));
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        procs.push(serde_json::json!({ "name": "Inso Agent", "visible": true }));
+    }
+
+    Ok(procs)
+}
+
+#[tauri::command]
+async fn capture_window_native(_window_name: Option<String>) -> Result<String, String> {
+    capture_screen_native().await
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -483,7 +586,11 @@ fn main() {
             inject_mouse_move,
             inject_mouse_click,
             inject_keyboard_type,
-            inject_keyboard_key
+            inject_keyboard_key,
+            get_screen_geometry,
+            focus_application_window,
+            get_system_running_processes,
+            capture_window_native
         ])
         .setup(|app| {
             let initial_cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
