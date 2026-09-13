@@ -1,22 +1,28 @@
 import { useState, useRef, useEffect } from 'react';
-import './App.css';
+import './index.css';
+import { invoke } from '@tauri-apps/api/core';
 
-/**
- * Inso Code Desktop — Industrial Command Center.
- * The 'Universe-Best' interface for Fortune 500 orchestration.
- * Designed by the greatest software designer in history.
- */
-function App() {
+export default function App() {
   const [prompt, setPrompt] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
   const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-
+  const [telemetry, setTelemetry] = useState<any>(null);
+  
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    // Initialize Sovereign Bedrock + Greengrass Edge on boot
+    invoke('initialize_sovereign_bedrock').catch(console.error);
+    
+    const interval = setInterval(() => {
+      invoke('get_swarm_telemetry').then((res) => setTelemetry(res)).catch(console.error);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && prompt.trim() && !isStreaming) {
@@ -26,68 +32,20 @@ function App() {
       setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
       setIsStreaming(true);
       
-      // Add an empty assistant message to append to
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Processing via Hybrid Edge-to-Cloud ML...' }]);
 
       try {
-        const response = await fetch('http://localhost:5001/api/v1/ai/task/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: userMessage })
-        });
-
-        if (!response.body) throw new Error("No response body");
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.replace('data: ', '').trim();
-              if (!dataStr) continue;
-              try {
-                const data = JSON.parse(dataStr);
-                if (data.status === 'DONE') {
-                  setIsStreaming(false);
-                  break;
-                }
-                if (data.status === 'ERROR') {
-                  setMessages(prev => {
-                    const newArr = [...prev];
-                    newArr[newArr.length - 1].content += `\n[ERROR]: ${data.message}`;
-                    return newArr;
-                  });
-                  break;
-                }
-                
-                // Assuming data has a message or delta field
-                const textToAdd = data.message || data.delta || JSON.stringify(data);
-                
-                setMessages(prev => {
-                  const newArr = [...prev];
-                  const lastMsg = newArr[newArr.length - 1];
-                  lastMsg.content = lastMsg.content ? lastMsg.content + '\n' + textToAdd : textToAdd;
-                  return newArr;
-                });
-              } catch (e) {
-                console.error("Parse error", e);
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error(err);
+        const result = await invoke('execute_agent_mission', { missionId: Date.now().toString(), command: userMessage });
         setMessages(prev => {
-           const newArr = [...prev];
-           newArr[newArr.length - 1].content += "\n[FATAL ERROR] Could not reach backend swarm on localhost:5001";
-           return newArr;
+          const newMsg = [...prev];
+          newMsg[newMsg.length - 1].content = result as string;
+          return newMsg;
+        });
+      } catch (err) {
+        setMessages(prev => {
+          const newMsg = [...prev];
+          newMsg[newMsg.length - 1].content = `System Halt: ${err}`;
+          return newMsg;
         });
       } finally {
         setIsStreaming(false);
@@ -96,126 +54,110 @@ function App() {
   };
 
   return (
-    <>
-      <div className="mesh-background">
-        <div className="mesh-orb orb-1" />
-        <div className="mesh-orb orb-2" />
-        <div className="mesh-orb orb-3" />
+    <div className="layout">
+      {/* Titlebar / Window Chrome */}
+      <div data-tauri-drag-region className="titlebar">
+        <div className="titlebar-controls">
+          <div className="control close"></div>
+          <div className="control minimize"></div>
+          <div className="control maximize"></div>
+        </div>
+        <div className="titlebar-title" data-tauri-drag-region>
+          AWS GREENGRASS EDGE CLUSTER — CLAUDE 5 SONNET
+        </div>
+        <div className="titlebar-status">
+          <div className={`status-dot ${telemetry?.status === 'flawless' ? 'active' : ''}`}></div>
+          <span className="mono-text">{telemetry?.sovereign_plane || 'INITIALIZING'}</span>
+        </div>
       </div>
 
-      <div className="app-container">
-        
-        <header className="enterprise-header">
-          <div className="status-dot" style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 12px #10b981', marginRight: 12 }} />
-          <span className="brand-text">INSO CODE <span className="version-badge">DESKTOP v3.0.0</span></span>
-          <div className="spacer" />
-          <div className="clearance-badge">SECURE CLEARANCE: OMEGA</div>
-        </header>
-
-        <div className="main-content">
-          <main className="chat-viewport flex flex-col h-full" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+      <div className="main-container">
+        {/* Sidebar */}
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <h2 className="serif-title">Live Execution Matrix</h2>
+          </div>
+          
+          <div className="telemetry-grid">
+            <div className="telemetry-box highlight">
+              <span className="t-label">EDGE ML COMPUTE (GPU)</span>
+              <span className="t-val accent">{telemetry?.edge_compute || 'IDLE'}</span>
+              <div className="progress-bar"><div className="fill" style={{width: '78%'}}></div></div>
+            </div>
             
-            <div className="messages-scroll" style={{ flex: 1, overflowY: 'auto', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
-              {messages.length === 0 ? (
-                <div className="system-greeting" style={{ margin: 'auto', textAlign: 'center' }}>
-                  <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Welcome to the Nexus, Commander.</h1>
-                  <p style={{ color: '#888' }}>The smartest software engineer in the world is online.</p>
+            <div className="telemetry-box highlight">
+              <span className="t-label">AWS BEDROCK CLOUD</span>
+              <span className="t-val">{telemetry?.bedrock_connectivity || 'STANDBY'}</span>
+              <div className="progress-bar"><div className="fill" style={{width: '34%'}}></div></div>
+            </div>
+          </div>
+          
+          <ul className="mission-list">
+            <li className="mission-item active">
+              <span className="mission-title">Continuous Vision Sync</span>
+              <span className="mission-meta">60 FPS Local GPU</span>
+            </li>
+            <li className="mission-item">
+              <span className="mission-title">AWS SageMaker Sync</span>
+              <span className="mission-meta">Model Weights Optimal</span>
+            </li>
+          </ul>
+          
+          <div className="sidebar-footer">
+            <div className="telemetry-box">
+              <div className="t-row"><span className="t-label">EDGE LATENCY</span><span className="t-val">{telemetry?.edge_latency || '--'}</span></div>
+              <div className="t-row"><span className="t-label">CLOUD LATENCY</span><span className="t-val">{telemetry?.cloud_latency || '--'}</span></div>
+              <div className="t-row"><span className="t-label">OS CLEARANCE</span><span className="t-val">{telemetry?.local_hands_clearance || '--'}</span></div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Chat Area */}
+        <main className="chat-area">
+          <div className="messages">
+            {messages.length === 0 ? (
+              <div className="empty-state">
+                <h1 className="serif-title large">Physical Hardware Bridged.</h1>
+                <p className="empty-subtitle">Local GPU and AWS Bedrock are synchronized. You have absolute OS control.</p>
+                <div className="bento-grid">
+                  <div className="bento-card" onClick={() => setPrompt('Execute high-speed local UI extraction')}>
+                    <h3>Scrape Local Application</h3>
+                    <p>Trigger 60 FPS Edge Vision</p>
+                  </div>
+                  <div className="bento-card" onClick={() => setPrompt('Run complex financial model manipulation')}>
+                    <h3>Execute Macro OS Actions</h3>
+                    <p>Leverage Claude 5 Orchestration</p>
+                  </div>
                 </div>
-              ) : (
-                messages.map((msg, idx) => (
-                  <div key={idx} style={{ 
-                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                    background: msg.role === 'user' ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' : 'rgba(20, 20, 20, 0.7)',
-                    border: msg.role === 'user' ? 'none' : '1px solid #333',
-                    padding: '1rem 1.5rem',
-                    borderRadius: '16px',
-                    maxWidth: '80%',
-                    color: 'white',
-                    fontFamily: 'monospace',
-                    fontSize: '13px',
-                    whiteSpace: 'pre-wrap'
-                  }}>
+              </div>
+            ) : (
+              messages.map((msg, i) => (
+                <div key={i} className={`message-row ${msg.role}`}>
+                  <div className="message-content">
                     {msg.content}
                   </div>
-                ))
-              )}
-              <div ref={endOfMessagesRef} />
-            </div>
-
-            <div className="command-bar-container" style={{ padding: '2rem', paddingTop: 0 }}>
-              <div className={`glass-panel command-bar ${isFocused ? 'focused' : ''}`}>
-                <input 
-                  type="text" 
-                  placeholder="Ask the Swarm to architect, build, and deploy..."
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  onKeyDown={handleSubmit}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
-                  autoFocus
-                  disabled={isStreaming}
-                />
-                <div className="interaction-indicators">
-                  <span className="shortcut-hint">{isStreaming ? "PROCESSING..." : "⌘ ↵"}</span>
                 </div>
-              </div>
-            </div>
-          </main>
-
-          <aside className="telemetry-sidebar">
-            <div className="telemetry-header">
-              <span className="telemetry-title">Swarm Telemetry</span>
-              <div className="live-indicator">
-                <div className="pulse-dot" /> LIVE
-              </div>
-            </div>
-
-            <div className="telemetry-grid">
-              <div className="telemetry-card">
-                <div className="card-label">Active Agents</div>
-                <div className="card-value cyan">1,024</div>
-                <div className="mini-graph">
-                  <div className="bar"></div>
-                  <div className="bar"></div>
-                  <div className="bar"></div>
-                  <div className="bar"></div>
-                  <div className="bar"></div>
-                </div>
-              </div>
-
-              <div className="telemetry-card">
-                <div className="card-label">Cognitive Load</div>
-                <div className="card-value purple">14.2 TF</div>
-                <div className="mini-graph">
-                  <div className="bar" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="bar" style={{ animationDelay: '0.4s' }}></div>
-                  <div className="bar" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="bar" style={{ animationDelay: '0.5s' }}></div>
-                  <div className="bar" style={{ animationDelay: '0.3s' }}></div>
-                </div>
-              </div>
-
-              <div className="telemetry-card">
-                <div className="card-label">Global Context</div>
-                <div className="card-value">{messages.length > 0 ? "Synced" : "Awaiting Input"}</div>
-              </div>
-            </div>
-          </aside>
-        </div>
-
-        <footer className="enterprise-footer">
-          <div className="connection-stats">
-            <span>LATENCY: 8ms</span>
-            <span>A2A PROTOCOL: ENFORCED</span>
-            <span>AGUI VISION: ACTIVE</span>
+              ))
+            )}
+            <div ref={endOfMessagesRef} />
           </div>
-          <div className="legal-notice">
-            Sovereign Data Protection Active.
+
+          <div className="input-area">
+            <input 
+              type="text" 
+              className="chat-input" 
+              placeholder="Inject command into the Edge-Cloud matrix..." 
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={handleSubmit}
+              autoFocus
+            />
+            <div className="input-hint">
+              Press <kbd>Enter</kbd> to execute on BARE METAL
+            </div>
           </div>
-        </footer>
+        </main>
       </div>
-    </>
+    </div>
   );
 }
-
-export default App;
