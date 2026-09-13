@@ -1,12 +1,59 @@
 import { useState, useRef, useEffect } from 'react';
-import './index.css';
 import { invoke } from '@tauri-apps/api/core';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Sphere, MeshDistortMaterial } from '@react-three/drei';
+import * as THREE from 'three';
+import './index.css';
+
+// 3D Neural Swarm Component
+function SwarmNode({ position, color, speed }: { position: [number, number, number], color: string, speed: number }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  
+  useFrame((state) => {
+    if (meshRef.current) {
+      meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * speed) * 0.5;
+      meshRef.current.rotation.x += 0.01;
+      meshRef.current.rotation.y += 0.01;
+    }
+  });
+
+  return (
+    <Sphere ref={meshRef} position={position} args={[0.4, 32, 32]}>
+      <MeshDistortMaterial color={color} envMapIntensity={1} clearcoat={1} clearcoatRoughness={0} metalness={0.8} roughness={0.2} distort={0.4} speed={speed} />
+    </Sphere>
+  );
+}
+
+function HolographicSwarm({ activeNodes }: { activeNodes: number }) {
+  const nodes = Array.from({ length: activeNodes }).map((_, i) => ({
+    position: [
+      (Math.random() - 0.5) * 6,
+      (Math.random() - 0.5) * 4,
+      (Math.random() - 0.5) * 2
+    ] as [number, number, number],
+    color: i === 0 ? '#00FF9D' : '#1F6C9F',
+    speed: Math.random() * 2 + 1
+  }));
+
+  return (
+    <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[10, 10, 5]} intensity={1.5} />
+      <pointLight position={[-10, -10, -5]} color="#00FF9D" intensity={2} />
+      {nodes.map((node, i) => (
+        <SwarmNode key={i} position={node.position} color={node.color} speed={node.speed} />
+      ))}
+      <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={1.5} />
+    </Canvas>
+  );
+}
 
 export default function App() {
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [telemetry, setTelemetry] = useState<any>(null);
+  const [activeNodes, setActiveNodes] = useState(3);
   
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -15,7 +62,6 @@ export default function App() {
   }, [messages]);
 
   useEffect(() => {
-    // Initialize Sovereign Bedrock + Greengrass Edge on boot
     invoke('initialize_sovereign_bedrock').catch(console.error);
     
     const interval = setInterval(() => {
@@ -28,11 +74,12 @@ export default function App() {
     if (e.key === 'Enter' && prompt.trim() && !isStreaming) {
       const userMessage = prompt;
       setPrompt('');
+      setActiveNodes(prev => Math.min(prev + 2, 12)); // Spin up nodes dynamically
 
       setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
       setIsStreaming(true);
       
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Processing via Hybrid Edge-to-Cloud ML...' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Spinning up decentralized Edge-to-Cloud neural swarm...' }]);
 
       try {
         const result = await invoke('execute_agent_mission', { missionId: Date.now().toString(), command: userMessage });
@@ -49,6 +96,7 @@ export default function App() {
         });
       } finally {
         setIsStreaming(false);
+        setActiveNodes(3); // Cool down nodes
       }
     }
   };
@@ -63,7 +111,7 @@ export default function App() {
           <div className="control maximize"></div>
         </div>
         <div className="titlebar-title" data-tauri-drag-region>
-          AWS GREENGRASS EDGE CLUSTER — CLAUDE 5 SONNET
+          INSO AGENT // KINETIC SWARM CLUSTER
         </div>
         <div className="titlebar-status">
           <div className={`status-dot ${telemetry?.status === 'flawless' ? 'active' : ''}`}></div>
@@ -72,42 +120,31 @@ export default function App() {
       </div>
 
       <div className="main-container">
-        {/* Sidebar */}
-        <aside className="sidebar">
+        {/* Holographic Neural Swarm UI */}
+        <aside className="sidebar visual-sidebar">
           <div className="sidebar-header">
-            <h2 className="serif-title">Live Execution Matrix</h2>
+            <h2 className="serif-title">Neural Swarm Topology</h2>
+          </div>
+          
+          <div className="hologram-container">
+            <HolographicSwarm activeNodes={activeNodes} />
+            <div className="hologram-overlay">
+              <span className="overlay-text">ACTIVE NODES: {activeNodes}</span>
+              <span className="overlay-text highlight">OS VECTOR INDEX: 142.1M HASHES</span>
+            </div>
           </div>
           
           <div className="telemetry-grid">
             <div className="telemetry-box highlight">
               <span className="t-label">EDGE ML COMPUTE (GPU)</span>
               <span className="t-val accent">{telemetry?.edge_compute || 'IDLE'}</span>
-              <div className="progress-bar"><div className="fill" style={{width: '78%'}}></div></div>
+              <div className="progress-bar"><div className="fill" style={{width: isStreaming ? '95%' : '12%'}}></div></div>
             </div>
             
             <div className="telemetry-box highlight">
               <span className="t-label">AWS BEDROCK CLOUD</span>
-              <span className="t-val">{telemetry?.bedrock_connectivity || 'STANDBY'}</span>
-              <div className="progress-bar"><div className="fill" style={{width: '34%'}}></div></div>
-            </div>
-          </div>
-          
-          <ul className="mission-list">
-            <li className="mission-item active">
-              <span className="mission-title">Continuous Vision Sync</span>
-              <span className="mission-meta">60 FPS Local GPU</span>
-            </li>
-            <li className="mission-item">
-              <span className="mission-title">AWS SageMaker Sync</span>
-              <span className="mission-meta">Model Weights Optimal</span>
-            </li>
-          </ul>
-          
-          <div className="sidebar-footer">
-            <div className="telemetry-box">
-              <div className="t-row"><span className="t-label">EDGE LATENCY</span><span className="t-val">{telemetry?.edge_latency || '--'}</span></div>
-              <div className="t-row"><span className="t-label">CLOUD LATENCY</span><span className="t-val">{telemetry?.cloud_latency || '--'}</span></div>
-              <div className="t-row"><span className="t-label">OS CLEARANCE</span><span className="t-val">{telemetry?.local_hands_clearance || '--'}</span></div>
+              <span className="t-val">{telemetry?.memory_vault || 'STANDBY'}</span>
+              <div className="progress-bar"><div className="fill" style={{width: isStreaming ? '88%' : '4%'}}></div></div>
             </div>
           </div>
         </aside>
@@ -117,16 +154,16 @@ export default function App() {
           <div className="messages">
             {messages.length === 0 ? (
               <div className="empty-state">
-                <h1 className="serif-title large">Physical Hardware Bridged.</h1>
-                <p className="empty-subtitle">Local GPU and AWS Bedrock are synchronized. You have absolute OS control.</p>
+                <h1 className="serif-title large">Beyond Chat. Absolute OS Sovereignty.</h1>
+                <p className="empty-subtitle">Claude Code is a CLI. Cowork is a webpage. This is a BARE METAL operating system orchestrator.</p>
                 <div className="bento-grid">
-                  <div className="bento-card" onClick={() => setPrompt('Execute high-speed local UI extraction')}>
-                    <h3>Scrape Local Application</h3>
-                    <p>Trigger 60 FPS Edge Vision</p>
+                  <div className="bento-card" onClick={() => setPrompt('Index entire macOS filesystem locally')}>
+                    <h3>Global OS Vector Index</h3>
+                    <p>Instant file search without the cloud</p>
                   </div>
-                  <div className="bento-card" onClick={() => setPrompt('Run complex financial model manipulation')}>
-                    <h3>Execute Macro OS Actions</h3>
-                    <p>Leverage Claude 5 Orchestration</p>
+                  <div className="bento-card" onClick={() => setPrompt('Execute continuous hardware-level UI loop')}>
+                    <h3>Hardware Keystroke Injection</h3>
+                    <p>True 0ms physical latency bypass</p>
                   </div>
                 </div>
               </div>
@@ -146,7 +183,7 @@ export default function App() {
             <input 
               type="text" 
               className="chat-input" 
-              placeholder="Inject command into the Edge-Cloud matrix..." 
+              placeholder="Command the multi-agent swarm..." 
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleSubmit}
