@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Inso Agent",
+  "productName": "Inso AI",
   "version": "1.0.0",
-  "identifier": "com.inso.agent",
+  "identifier": "com.inso.ai",
   "build": {
     "beforeDevCommand": "",
     "devUrl": "http://127.0.0.1:3055",
@@ -15,7 +15,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Inso Code",
+        "title": "Inso AI (Work & Code)",
         "url": "/code",
         "width": 1200,
         "height": 800,
@@ -51,7 +51,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://updates.insocode.com/update/{{target}}/{{current_version}}"
+        "https://updates.insoai.com/update/{{target}}/{{current_version}}"
       ],
       "pubkey": "dW51c2VkX3B1YmxpY19rZXlfZm9yX3NpZ25pbmdfdXBkYXRlc19kZW1vCg=="
     }
