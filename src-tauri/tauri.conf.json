@@ -14,7 +14,8 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "",
+        "label": "main",
+        "title": "Inso Code",
         "url": "/code",
         "width": 1200,
         "height": 800,

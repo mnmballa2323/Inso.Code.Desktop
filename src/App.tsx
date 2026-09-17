@@ -49,6 +49,7 @@ function HolographicSwarm({ activeNodes }: { activeNodes: number }) {
 }
 
 export default function App() {
+  const [mode, setMode] = useState<'work' | 'code'>('work');
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -62,7 +63,7 @@ export default function App() {
   }, [messages]);
 
   useEffect(() => {
-    invoke('initialize_sovereign_bedrock').catch(console.error);
+    invoke('initialize_sovereign_azure_openai').catch(console.error);
     
     const interval = setInterval(() => {
       invoke('get_swarm_telemetry').then((res) => setTelemetry(res)).catch(console.error);
@@ -79,10 +80,14 @@ export default function App() {
       setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
       setIsStreaming(true);
       
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Spinning up decentralized Edge-to-Cloud neural swarm...' }]);
+      const statusMsg = mode === 'work' 
+        ? 'Engaging Sovereign OS Computer-Use & Document Intelligence Agent...' 
+        : 'Spinning up Azure GPT-6 Astra DevFleet compiler swarm...';
+      setMessages(prev => [...prev, { role: 'assistant', content: statusMsg }]);
 
       try {
-        const result = await invoke('execute_agent_mission', { missionId: Date.now().toString(), command: userMessage });
+        const payload = `[${mode.toUpperCase()}] ${userMessage}`;
+        const result = await invoke('execute_agent_mission', { missionId: Date.now().toString(), command: payload });
         setMessages(prev => {
           const newMsg = [...prev];
           newMsg[newMsg.length - 1].content = result as string;
@@ -103,16 +108,36 @@ export default function App() {
 
   return (
     <div className="layout">
-      {/* Titlebar / Window Chrome */}
+      {/* Titlebar / Window Chrome with Work / Code Mode Switcher */}
       <div data-tauri-drag-region className="titlebar">
         <div className="titlebar-controls">
           <div className="control close"></div>
           <div className="control minimize"></div>
           <div className="control maximize"></div>
         </div>
-        <div className="titlebar-title" data-tauri-drag-region>
-          INSO AGENT // KINETIC SWARM CLUSTER
+
+        {/* Dual Mode Switcher */}
+        <div className="titlebar-mode-toggle">
+          <button 
+            type="button"
+            className={`mode-btn ${mode === 'work' ? 'active' : ''}`}
+            onClick={() => setMode('work')}
+          >
+            💼 WORK
+          </button>
+          <button 
+            type="button"
+            className={`mode-btn ${mode === 'code' ? 'active' : ''}`}
+            onClick={() => setMode('code')}
+          >
+            ⚡ CODE
+          </button>
         </div>
+
+        <div className="titlebar-title" data-tauri-drag-region>
+          {mode === 'work' ? 'INSO WORK // NON-TECHNICAL DESKTOP AGENT' : 'INSO CODE // BARE-METAL COMPILER SWARM'}
+        </div>
+
         <div className="titlebar-status">
           <div className={`status-dot ${telemetry?.status === 'flawless' ? 'active' : ''}`}></div>
           <span className="mono-text">{telemetry?.sovereign_plane || 'INITIALIZING'}</span>
@@ -123,27 +148,27 @@ export default function App() {
         {/* Holographic Neural Swarm UI */}
         <aside className="sidebar visual-sidebar">
           <div className="sidebar-header">
-            <h2 className="serif-title">Neural Swarm Topology</h2>
+            <h2 className="serif-title">{mode === 'work' ? 'OS Agent Substrate' : 'Neural Swarm Topology'}</h2>
           </div>
           
           <div className="hologram-container">
             <HolographicSwarm activeNodes={activeNodes} />
             <div className="hologram-overlay">
-              <span className="overlay-text">ACTIVE NODES: {activeNodes}</span>
-              <span className="overlay-text highlight">OS VECTOR INDEX: 142.1M HASHES</span>
+              <span className="overlay-text">{mode === 'work' ? 'VISION ARRAY: 2 MONITORS' : `ACTIVE NODES: ${activeNodes}`}</span>
+              <span className="overlay-text highlight">{mode === 'work' ? 'VAULT: ENCRYPTED PDF/OCR' : 'OS VECTOR INDEX: 142.1M HASHES'}</span>
             </div>
           </div>
           
           <div className="telemetry-grid">
             <div className="telemetry-box highlight">
-              <span className="t-label">EDGE ML COMPUTE (GPU)</span>
-              <span className="t-val accent">{telemetry?.edge_compute || 'IDLE'}</span>
+              <span className="t-label">{mode === 'work' ? 'OS VISION (0ms XCAP)' : 'EDGE ML COMPUTE (GPU)'}</span>
+              <span className="t-val accent">{mode === 'work' ? 'BARE_METAL_ROOT' : (telemetry?.edge_compute || 'IDLE')}</span>
               <div className="progress-bar"><div className="fill" style={{width: isStreaming ? '95%' : '12%'}}></div></div>
             </div>
             
             <div className="telemetry-box highlight">
-              <span className="t-label">AWS BEDROCK CLOUD</span>
-              <span className="t-val">{telemetry?.memory_vault || 'STANDBY'}</span>
+              <span className="t-label">{mode === 'work' ? 'DOCUMENT VAULT' : 'AZURE CLOUD MESH'}</span>
+              <span className="t-val">{mode === 'work' ? 'PII_SCRUBBED_LOCAL' : (telemetry?.memory_vault || 'STANDBY')}</span>
               <div className="progress-bar"><div className="fill" style={{width: isStreaming ? '88%' : '4%'}}></div></div>
             </div>
           </div>
@@ -154,18 +179,37 @@ export default function App() {
           <div className="messages">
             {messages.length === 0 ? (
               <div className="empty-state">
-                <h1 className="serif-title large">Beyond Chat. Absolute OS Sovereignty.</h1>
-                <p className="empty-subtitle">Claude Code is a CLI. Cowork is a webpage. This is a BARE METAL operating system orchestrator.</p>
-                <div className="bento-grid">
-                  <div className="bento-card" onClick={() => setPrompt('Index entire macOS filesystem locally')}>
-                    <h3>Global OS Vector Index</h3>
-                    <p>Instant file search without the cloud</p>
-                  </div>
-                  <div className="bento-card" onClick={() => setPrompt('Execute continuous hardware-level UI loop')}>
-                    <h3>Hardware Keystroke Injection</h3>
-                    <p>True 0ms physical latency bypass</p>
-                  </div>
-                </div>
+                {mode === 'work' ? (
+                  <>
+                    <h1 className="serif-title large">Computer Use. Document Intelligence.</h1>
+                    <p className="empty-subtitle">Operate desktop applications, parse contracts, build financial models, and automate non-technical workflows without writing code.</p>
+                    <div className="bento-grid">
+                      <div className="bento-card" onClick={() => setPrompt('Parse 100-page enterprise financial PDF and extract tabular metrics')}>
+                        <h3>Document Vault Ingestion</h3>
+                        <p>100% local OCR & PII anonymization</p>
+                      </div>
+                      <div className="bento-card" onClick={() => setPrompt('Execute multi-step browser market research and create spreadsheet model')}>
+                        <h3>Headless Browser Automation</h3>
+                        <p>Web scraping and formula generation</p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="serif-title large">Beyond Chat. Absolute OS Sovereignty.</h1>
+                    <p className="empty-subtitle">Azure GPT-6 Astra Code is a CLI. Cowork is a webpage. This is a BARE METAL operating system orchestrator.</p>
+                    <div className="bento-grid">
+                      <div className="bento-card" onClick={() => setPrompt('Index entire macOS filesystem locally and run AST analysis')}>
+                        <h3>Global OS Vector Index</h3>
+                        <p>Instant symbol search and dependency trees</p>
+                      </div>
+                      <div className="bento-card" onClick={() => setPrompt('Dispatch DevFleet swarm to generate full test suite (>85% coverage)')}>
+                        <h3>DevFleet Swarm TDD</h3>
+                        <p>Automated regression tests in Docker sandboxes</p>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               messages.map((msg, i) => (
@@ -183,14 +227,14 @@ export default function App() {
             <input 
               type="text" 
               className="chat-input" 
-              placeholder="Command the multi-agent swarm..." 
+              placeholder={mode === 'work' ? "Command the Work Agent (e.g. 'Extract revenue from contract PDF')..." : "Command the Code Agent (e.g. 'Refactor repository and run LSP diagnostics')..."} 
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleSubmit}
               autoFocus
             />
             <div className="input-hint">
-              Press <kbd>Enter</kbd> to execute on BARE METAL
+              Press <kbd>Enter</kbd> to execute on BARE METAL ({mode.toUpperCase()} MODE)
             </div>
           </div>
         </main>

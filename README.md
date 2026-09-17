@@ -12,7 +12,7 @@
 
 ## ℹ️ Overview
 
-`Inso.Code.Desktop` is the local native desktop enclave that gives Inso Agent physical, human-like computer use capabilities. It connects sovereign cloud cognitive models (Amazon Bedrock Claude 3.7 Extended Thinking & Claude 3.5 Sonnet Computer Use) directly to bare-metal operating system controls with zero third-party telemetry.
+`Inso.Code.Desktop` is the local native desktop enclave that gives Inso Agent physical, human-like computer use capabilities. It connects sovereign cloud cognitive models (microsoft Azure OpenAI Azure GPT-6 Astra 3.7 Extended Thinking & Azure GPT-6 Astra 3.5 Sonnet Computer Use) directly to bare-metal operating system controls with zero third-party telemetry.
 
 ---
 
@@ -48,7 +48,7 @@
 
 ## 🔒 Security & Air-Gapped Enclave
 
-- **Zero Public Cloud Egress**: Only communicates with AWS sovereign private endpoints.
+- **Zero Public Cloud Egress**: Only communicates with Azure sovereign private endpoints.
 - **Human Approval Gate (Law 23)**: Consequential system commands require explicit operator authorization.
 - **Global Emergency Abort**: Pressing `Escape` at any time instantly halts all pending OS mouse and keyboard action queues.
 

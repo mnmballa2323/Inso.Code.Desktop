@@ -22,7 +22,7 @@ impl SovereignBrowserEngine {
         
         // let html = tab.get_content()?;
         
-        println!("✅ [Browser-Engine] DOM successfully extracted and serialized for AWS Bedrock.");
+        println!("✅ [Browser-Engine] DOM successfully extracted and serialized for Azure Azure OpenAI.");
         
         Ok(json!({
             "url": url,

@@ -1,5 +1,3 @@
-use git2::Repository;
-use bollard::Docker;
 use anyhow::Result;
 use serde_json::json;
 use std::path::Path;
