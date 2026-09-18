@@ -4,6 +4,7 @@ mod sandbox_engine;
 mod document_vault;
 mod browser_engine;
 mod lsp_bridge;
+mod platform_bridge;
 
 use tauri::{Manager, Emitter};
 use std::sync::Mutex;
@@ -201,7 +202,11 @@ fn main() {
             index_global_filesystem,
             ingest_secure_document,
             execute_browser_inspection,
-            query_lsp_diagnostics
+            query_lsp_diagnostics,
+            platform_bridge::native_hardware_telemetry,
+            platform_bridge::native_capture_screen,
+            platform_bridge::native_keychain_set,
+            platform_bridge::native_keychain_get
         ])
         .run(tauri::generate_context!())
         .expect("error while running sovereign tauri application");
