@@ -54,6 +54,11 @@
         "https://updates.insoai.com/update/{{target}}/{{current_version}}"
       ],
       "pubkey": "dW51c2VkX3B1YmxpY19rZXlfZm9yX3NpZ25pbmdfdXBkYXRlc19kZW1vCg=="
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["inso"]
+      }
     }
   }
 }
