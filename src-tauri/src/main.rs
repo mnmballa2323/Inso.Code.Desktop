@@ -204,6 +204,9 @@ fn main() {
             execute_browser_inspection,
             query_lsp_diagnostics,
             platform_bridge::native_hardware_telemetry,
+            platform_bridge::native_get_active_window_context,
+            platform_bridge::native_authenticate_biometrics,
+            platform_bridge::native_toggle_quickbar_hud,
             platform_bridge::native_capture_screen,
             platform_bridge::native_keychain_set,
             platform_bridge::native_keychain_get

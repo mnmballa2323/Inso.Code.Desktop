@@ -10,6 +10,20 @@ char* inso_apple_keychain_get(const char* key);
 int32_t inso_apple_keychain_delete(const char* key);
 void inso_apple_free_string(char* ptr);
 
+// Biometrics (Touch ID / LocalAuthentication)
+bool inso_apple_authenticate_biometrics(const char* reason);
+bool inso_apple_has_biometrics(void);
+
+// Workspace & Active Window Context
+char* inso_apple_get_frontmost_context(void);
+
+// Floating Spotlight HUD
+int32_t inso_apple_toggle_spotlight_hud(void);
+bool inso_apple_is_spotlight_hud_visible(void);
+
+// Metal & Deep Telemetry
+char* inso_apple_deep_telemetry(void);
+
 // Screen Vision
 char* inso_apple_capture_display(void);
 int32_t inso_apple_get_display_count(void);
