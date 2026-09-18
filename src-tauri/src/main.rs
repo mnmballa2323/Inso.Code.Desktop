@@ -123,7 +123,8 @@ async fn query_lsp_diagnostics(file_path: String) -> Result<serde_json::Value, S
 #[tauri::command]
 async fn execute_browser_inspection(url: String) -> Result<serde_json::Value, String> {
     let engine = browser_engine::SovereignBrowserEngine::new();
-    engine.inspect_local_dom(&url).map_err(|e| e.to_string())
+    let res = engine.inspect_local_dom(&url).map_err(|e| e.to_string())?;
+    serde_json::from_str(&res).map_err(|e| e.to_string())
 }
 
 
@@ -152,6 +153,19 @@ async fn index_global_filesystem() -> Result<serde_json::Value, String> {
         "vector_dimensions": 384,
         "search_latency_ms": 1.2
     }))
+}
+
+#[tauri::command]
+async fn ai_code_completion(prompt: String, context: String) -> Result<String, String> {
+    let ai = azure_intelligence::AzureIntelligence::new();
+    let response = ai.chat_completion(&prompt, &context).await?;
+    Ok(response.content)
+}
+
+#[tauri::command]
+async fn ai_search_codebase(query: String) -> Result<Vec<String>, String> {
+    let ai = azure_intelligence::AzureIntelligence::new();
+    ai.search_codebase(&query).await
 }
 
 fn main() {
@@ -196,6 +210,8 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            ai_code_completion,
+            ai_search_codebase,
             initialize_sovereign_azure_openai,
             execute_agent_mission,
             execute_computer_action,

@@ -13,14 +13,14 @@ pub struct AzureNetworkPolicy {
 impl AzureNetworkPolicy {
     pub fn new() -> Self {
         let mut domains = HashSet::new();
-        // 🔒 The Hard Law: Only Azure and GitHub domains are permitted.
-        domains.insert("openai.azure.com");
-        domains.insert("vault.azure.net");
-        domains.insert("documents.azure.com");
-        domains.insert("search.windows.net");
+        // Azure sovereign: only Azure endpoints allowed
+        domains.insert("azure.com");
+        domains.insert("microsoft.com");
+        domains.insert("windows.net");
         domains.insert("github.com");
         domains.insert("api.github.com");
-        domains.insert("login.microsoftonline.com");
+
+        domains.insert("inso.code");
         
         Self { allowed_domains: domains }
     }

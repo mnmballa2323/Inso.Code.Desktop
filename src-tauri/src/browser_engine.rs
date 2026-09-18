@@ -1,34 +1,35 @@
 use headless_chrome::{Browser, LaunchOptions};
-use anyhow::Result;
 use serde_json::json;
 
-pub struct SovereignBrowserEngine {
-    // Persistent browser instance for the agent
-}
+pub struct SovereignBrowserEngine;
 
 impl SovereignBrowserEngine {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 
-    pub fn inspect_local_dom(&self, url: &str) -> Result<serde_json::Value> {
-        println!("🌐 [Browser-Engine] Spinning up isolated headless Chrome for URL: {}", url);
-        
-        // In production, this launches a secure, sandboxed headless Chrome instance
-        // let browser = Browser::new(LaunchOptions::default_builder().build().unwrap())?;
-        // let tab = browser.new_tab()?;
-        // tab.navigate_to(url)?;
-        // tab.wait_until_navigated()?;
-        
-        // let html = tab.get_content()?;
-        
-        println!("✅ [Browser-Engine] DOM successfully extracted and serialized for Azure Azure OpenAI.");
-        
+    pub fn inspect_local_dom(&self, url: &str) -> Result<String, String> {
+        let browser = Browser::new(
+            LaunchOptions::default_builder()
+                .headless(true)
+                .sandbox(true)
+                .build()
+                .map_err(|e| format!("Launch options error: {}", e))?
+        ).map_err(|e| format!("Browser launch error: {}", e))?;
+
+        let tab = browser.new_tab().map_err(|e| format!("Tab error: {}", e))?;
+        tab.navigate_to(url).map_err(|e| format!("Navigation error: {}", e))?;
+        tab.wait_until_navigated().map_err(|e| format!("Wait error: {}", e))?;
+
+        let html = tab.get_content().map_err(|e| format!("Content error: {}", e))?;
+        let title = tab.get_title().unwrap_or_else(|_| "Untitled".to_string());
+
         Ok(json!({
             "url": url,
-            "status": 200,
-            "dom_snapshot": "<div id='app'><h1>Sovereign Dev Server</h1></div>",
-            "console_errors": []
-        }))
+            "title": title,
+            "html_length": html.len(),
+            "html_preview": &html[..html.len().min(2000)],
+            "status": "success"
+        }).to_string())
     }
 }
