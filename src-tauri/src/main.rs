@@ -5,6 +5,9 @@ mod document_vault;
 mod browser_engine;
 mod lsp_bridge;
 mod platform_bridge;
+mod azure_confidential_core;
+mod azure_intelligence;
+mod edge_cloud_orchestrator;
 
 use tauri::{Manager, Emitter};
 use std::sync::Mutex;
@@ -209,7 +212,9 @@ fn main() {
             platform_bridge::native_toggle_quickbar_hud,
             platform_bridge::native_capture_screen,
             platform_bridge::native_keychain_set,
-            platform_bridge::native_keychain_get
+            platform_bridge::native_keychain_get,
+            edge_cloud_orchestrator::execute_edge_cloud_hybrid,
+            edge_cloud_orchestrator::get_edge_cloud_mesh_telemetry
         ])
         .run(tauri::generate_context!())
         .expect("error while running sovereign tauri application");
