@@ -12,7 +12,7 @@
 
 ## ℹ️ Overview
 
-`Inso.Code.Desktop` is the local native desktop enclave that gives Inso Agent physical, human-like computer use capabilities. It connects sovereign cloud cognitive models (microsoft Azure OpenAI Azure GPT-6 Astra 3.7 Extended Thinking & Azure GPT-6 Astra 3.5 Sonnet Computer Use) directly to bare-metal operating system controls with zero third-party telemetry.
+`Inso.Code.Desktop` is the local native desktop enclave that gives Inso Agent physical, human-like computer use capabilities. It connects sovereign cloud cognitive models (Microsoft Azure OpenAI GPT-6 Astra, GPT-5.6 Sol, GPT-5.6 Terra, and GPT-5.6 Luna) directly to bare-metal operating system controls with zero third-party telemetry.
 
 ---
 
