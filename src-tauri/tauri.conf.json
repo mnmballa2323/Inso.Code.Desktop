@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Inso AI",
+  "productName": "Inso Code",
   "version": "1.0.0",
-  "identifier": "com.inso.ai",
+  "identifier": "com.inso.code",
   "build": {
     "beforeDevCommand": "",
     "devUrl": "http://127.0.0.1:3000",
@@ -15,7 +15,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Inso AI (Work & Code)",
+        "title": "Inso Code",
         "url": "/code",
         "width": 1200,
         "height": 800,

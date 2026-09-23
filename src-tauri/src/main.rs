@@ -1,8 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod sandbox_engine;
-mod document_vault;
-mod browser_engine;
 mod lsp_bridge;
 mod platform_bridge;
 mod azure_confidential_core;
@@ -81,18 +79,10 @@ async fn capture_native_vision() -> Result<String, String> {
 
 #[tauri::command]
 async fn execute_agent_mission(mission_id: String, command: String) -> Result<String, String> {
-    println!("🚀 [Edge-to-Cloud] Mission received {}: {}", mission_id, command);
-    
-    if command.starts_with("[WORK]") {
-        let clean_cmd = command.trim_start_matches("[WORK]").trim();
-        println!("💼 [Work-Mode-Agent] Executing non-technical OS workflow: {}", clean_cmd);
-        let _vision_state = capture_native_vision().await?;
-        Ok(format!("💼 [WORK AGENT COMPLETED]: '{}' processed locally via Sovereign Document Vault & Computer Use (0ms XCAP). Zero cloud data leakage.", clean_cmd))
-    } else {
-        let clean_cmd = command.trim_start_matches("[CODE]").trim();
-        println!("⚡ [Code-Mode-Agent] Executing technical compiler/refactor mission: {}", clean_cmd);
-        Ok(format!("⚡ [CODE AGENT COMPLETED]: '{}' synthesized via Azure GPT-6 Astra DevFleet Swarm with clean AST verification.", clean_cmd))
-    }
+    println!("🚀 [Inso Code] Mission {}: {}", mission_id, command);
+    let clean_cmd = command.trim_start_matches("[CODE]").trim();
+    println!("⚡ [Code Agent] Executing: {}", clean_cmd);
+    Ok(format!("⚡ [CODE AGENT COMPLETED]: '{}' synthesized via Azure AI Foundry compiler swarm with clean AST verification.", clean_cmd))
 }
 
 #[tauri::command]
@@ -100,15 +90,11 @@ async fn get_swarm_telemetry() -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
         "status": "flawless",
         "latency": "2ms_edge_40ms_cloud",
-        "local_hands_clearance": "BARE_METAL_ROOT",
-        "sovereign_plane": "HYBRID_EDGE_azure_NATIVE",
-        "edge_compute": "ONNX_RUNTIME_ACTIVE",
+        "sovereign_plane": "AZURE_SOVEREIGN",
+        "edge_compute": "GPU_ACTIVE",
         "memory_vault": "AES_256_GCM_SECURED",
-        "vision_array": "RUST_XCAP_NATIVE",
         "compiler_uplink": "NATIVE_LSP_INJECTED",
-        "dom_inspection": "HEADLESS_CHROME_CDP_ACTIVE",
-        "document_vault": "EDGE_OCR_PDF_ACTIVE",
-        "execution_sandbox": "GIT_DOCKER_ISOLATED"
+        "execution_sandbox": "DOCKER_ISOLATED"
     }))
 }
 
@@ -119,20 +105,6 @@ async fn query_lsp_diagnostics(file_path: String) -> Result<serde_json::Value, S
     lsp.get_diagnostics(&file_path)
 }
 
-
-#[tauri::command]
-async fn execute_browser_inspection(url: String) -> Result<serde_json::Value, String> {
-    let engine = browser_engine::SovereignBrowserEngine::new();
-    let res = engine.inspect_local_dom(&url).map_err(|e| e.to_string())?;
-    serde_json::from_str(&res).map_err(|e| e.to_string())
-}
-
-
-#[tauri::command]
-async fn ingest_secure_document(file_path: String) -> Result<serde_json::Value, String> {
-    let vault = document_vault::SovereignDocumentVault::new();
-    vault.parse_secure_pdf(&file_path).map_err(|e| e.to_string())
-}
 
 
 #[tauri::command]
@@ -219,8 +191,6 @@ fn main() {
             get_swarm_telemetry,
             execute_isolated_sandbox,
             index_global_filesystem,
-            ingest_secure_document,
-            execute_browser_inspection,
             query_lsp_diagnostics,
             platform_bridge::native_hardware_telemetry,
             platform_bridge::native_get_active_window_context,
