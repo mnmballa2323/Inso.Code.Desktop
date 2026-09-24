@@ -32,7 +32,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' tauri: 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* http://127.0.0.1:* ws://127.0.0.1:* https://*.azure.com https://*.microsoft.com https://*.windows.net tauri:; frame-src 'self'; object-src 'none'"
     }
   },
 
@@ -49,7 +49,7 @@
   },
   "plugins": {
     "updater": {
-      "active": true,
+      "active": false,
       "endpoints": [
         "https://updates.insoai.com/update/{{target}}/{{current_version}}"
       ],
