@@ -44,3 +44,8 @@ url = "2.5"
 secrecy = "0.8"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 azure_storage_blobs = "0.21"
+azure_security_keyvault = "0.21"
+tree-sitter = "0.22"
+enigo = "0.2"
+tiktoken-rs = "0.5"
+
