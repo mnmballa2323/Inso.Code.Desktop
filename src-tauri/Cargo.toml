@@ -48,4 +48,6 @@ azure_security_keyvault = "0.21"
 tree-sitter = "0.22"
 enigo = "0.2"
 tiktoken-rs = "0.5"
+tantivy = "0.22"
+
 
