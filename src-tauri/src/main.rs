@@ -31,11 +31,14 @@ impl AzureOpenAIClient {
 use xcap::Monitor;
 use aes_gcm::{aead::{Aead, AeadCore, KeyInit, OsRng}, Aes256Gcm, Nonce};
 
+pub mod native_engines;
+
 pub struct EdgeCloudEnclaveState {
     pub cwd: Mutex<PathBuf>,
     pub azure_openai_client: Mutex<Option<AzureOpenAIClient>>,
     pub local_ml_engine_ready: Mutex<bool>,
     pub db_pool: Mutex<Option<sqlx::SqlitePool>>,
+    pub native_engines: native_engines::LocalEngines,
 }
 
 /**
@@ -64,9 +67,20 @@ async fn initialize_sovereign_azure_openai(state: tauri::State<'_, EdgeCloudEncl
 }
 
 #[tauri::command]
-async fn execute_computer_action(action_type: String, params: serde_json::Value) -> Result<String, String> {
+async fn execute_computer_action(state: tauri::State<'_, EdgeCloudEnclaveState>, action_type: String, params: serde_json::Value) -> Result<String, String> {
     println!("🤖 [Sovereign-Computer-Use] Executing native action: {}", action_type);
-    Ok(format!("OS Action '{}' successfully executed.", action_type))
+    match action_type.as_str() {
+        "mouse_move" => {
+            let x = params["x"].as_i64().unwrap_or(0) as i32;
+            let y = params["y"].as_i64().unwrap_or(0) as i32;
+            state.native_engines.execute_mouse_move(x, y)
+        },
+        "keyboard_type" => {
+            let text = params["text"].as_str().unwrap_or("");
+            state.native_engines.execute_keyboard_type(text)
+        },
+        _ => Ok(format!("OS Action '{}' simulated.", action_type))
+    }
 }
 
 #[tauri::command]
@@ -115,9 +129,13 @@ async fn execute_isolated_sandbox(repo_path: String, mission_id: String) -> Resu
 
 
 #[tauri::command]
-async fn index_global_filesystem() -> Result<serde_json::Value, String> {
+async fn index_global_filesystem(state: tauri::State<'_, EdgeCloudEnclaveState>) -> Result<serde_json::Value, String> {
     println!("🗄️ [OS-Indexer] Spawning parallel background threads to index entire local filesystem.");
     println!("🧠 [OS-Indexer] Initializing Tantivy pure-Rust BM25 & vector index with AES-256 local encrypted storage.");
+    
+    let storage_path = PathBuf::from("/tmp/inso_tantivy_index");
+    let result = state.native_engines.init_tantivy_index(&storage_path)?;
+    println!("{}", result);
     
     Ok(serde_json::json!({
         "status": "OS_INDEXED",
@@ -136,6 +154,16 @@ async fn ai_code_completion(prompt: String, context: String) -> Result<String, S
 }
 
 #[tauri::command]
+async fn parse_code_ast(state: tauri::State<'_, EdgeCloudEnclaveState>, source_code: String) -> Result<String, String> {
+    state.native_engines.parse_ast_tree(&source_code)
+}
+
+#[tauri::command]
+async fn count_tokens(state: tauri::State<'_, EdgeCloudEnclaveState>, text: String) -> Result<usize, String> {
+    state.native_engines.count_azure_tokens(&text)
+}
+
+#[tauri::command]
 async fn ai_search_codebase(query: String) -> Result<Vec<String>, String> {
     let ai = azure_intelligence::AzureIntelligence::new();
     ai.search_codebase(&query).await
@@ -148,6 +176,7 @@ fn main() {
             azure_openai_client: Mutex::new(None),
             local_ml_engine_ready: Mutex::new(false),
             db_pool: Mutex::new(None),
+            native_engines: native_engines::LocalEngines::new(),
         })
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -185,6 +214,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             ai_code_completion,
             ai_search_codebase,
+            parse_code_ast,
+            count_tokens,
             initialize_sovereign_azure_openai,
             execute_agent_mission,
             execute_computer_action,
