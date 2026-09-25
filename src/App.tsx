@@ -1,71 +1,71 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import Editor, { DiffEditor, useMonaco } from '@monaco-editor/react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Instances, Instance } from '@react-three/drei';
+import { OrbitControls, Sphere, MeshDistortMaterial } from '@react-three/drei';
 import * as THREE from 'three';
-import './App.css';
+import Editor, { DiffEditor, useMonaco } from '@monaco-editor/react';
+import './index.css';
 
-// ==============================================================================
-// 1. HOLOGRAM UI (THREE.JS)
-// ==============================================================================
-function HolographicSwarm({ activeNodes }: { activeNodes: number }) {
-  const ref = useRef<any>();
+// 3D Neural Swarm Component
+function SwarmNode({ position, color, speed }: { position: [number, number, number], color: string, speed: number }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  
   useFrame((state) => {
-    if (ref.current) ref.current.rotation.y = state.clock.elapsedTime * 0.2;
+    if (meshRef.current) {
+      meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * speed) * 0.5;
+      meshRef.current.rotation.x += 0.01;
+      meshRef.current.rotation.y += 0.01;
+    }
   });
 
   return (
-    <Canvas camera={{ position: [0, 2, 5], fov: 45 }} gl={{ alpha: true }}>
+    <Sphere ref={meshRef} position={position} args={[0.4, 32, 32]}>
+      <MeshDistortMaterial color={color} envMapIntensity={1} clearcoat={1} clearcoatRoughness={0} metalness={0.8} roughness={0.2} distort={0.4} speed={speed} />
+    </Sphere>
+  );
+}
+
+function HolographicSwarm({ activeNodes }: { activeNodes: number }) {
+  const nodes = Array.from({ length: activeNodes }).map((_, i) => ({
+    position: [
+      (Math.random() - 0.5) * 6,
+      (Math.random() - 0.5) * 4,
+      (Math.random() - 0.5) * 2
+    ] as [number, number, number],
+    color: i === 0 ? '#00FF9D' : '#1F6C9F',
+    speed: Math.random() * 2 + 1
+  }));
+
+  return (
+    <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
       <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} color="#00FF9D" intensity={2} />
-      <group ref={ref}>
-        <Instances limit={100} range={activeNodes}>
-          <boxGeometry args={[0.1, 0.1, 0.1]} />
-          <meshBasicMaterial color="#00FF9D" wireframe />
-          {Array.from({ length: 100 }).map((_, i) => (
-            <Instance 
-              key={i} 
-              position={[
-                (Math.random() - 0.5) * 3, 
-                (Math.random() - 0.5) * 3, 
-                (Math.random() - 0.5) * 3
-              ]} 
-            />
-          ))}
-        </Instances>
-      </group>
-      <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={2.0} />
+      <directionalLight position={[10, 10, 5]} intensity={1.5} />
+      <pointLight position={[-10, -10, -5]} color="#00FF9D" intensity={2} />
+      {nodes.map((node, i) => (
+        <SwarmNode key={i} position={node.position} color={node.color} speed={node.speed} />
+      ))}
+      <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={1.5} />
     </Canvas>
   );
 }
 
-// ==============================================================================
-// 2. MAIN APPLICATION (React)
-// ==============================================================================
 export default function App() {
-  // Global State
-  const [activeTab, setActiveTab] = useState<'chat' | 'work' | 'code'>('code');
-  const [telemetry, setTelemetry] = useState<any>(null);
-
-  // Shared Chat State
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const endOfMessagesRef = useRef<HTMLDivElement>(null);
-
-  // Code Tab State
-  const monaco = useMonaco();
-  const [code, setCode] = useState('// Sovereign Azure Enclave\n\nfunction initialize() {\n  return "Secured.";\n}');
-  const [composerCode, setComposerCode] = useState('');
-  const [viewMode, setViewMode] = useState<'editor' | 'diff'>('editor');
+  const [telemetry, setTelemetry] = useState<any>(null);
   const [activeNodes, setActiveNodes] = useState(3);
-
-  // Work Tab State
-  const [professionContext, setProfessionContext] = useState('Financial Analyst');
+  const [code, setCode] = useState<string>('// Welcome to Inso Code Agent\n// We are now running Azure Copilot Engine + Composer Mode.\n\nfunction calculateEncryption() {\n  \n}\n');
+  const [composerCode, setComposerCode] = useState<string>('// Welcome to Inso Code Agent\n// We are now running Azure Copilot Engine + Composer Mode.\n\nfunction calculateEncryption() {\n  const vault = new AzureKeyVault();\n  return vault.encrypt("sovereign_data");\n}\n');
+  const [viewMode, setViewMode] = useState<'editor' | 'diff'>('editor');
+  // @ts-ignore
+  const [editorLanguage, setEditorLanguage] = useState<string>('typescript');
+  
+  const endOfMessagesRef = useRef<HTMLDivElement>(null);
+  const monaco = useMonaco();
 
   useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -76,45 +76,59 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Copilot Ghost Text Provider
+  useEffect(() => {
+    if (monaco) {
+      const provider = monaco.languages.registerInlineCompletionsProvider('typescript', {
+        // @ts-ignore
+        provideInlineCompletions: async (model, position, context, token) => {
+          // In production, this invokes the fast local Codex/ONNX runtime or Azure OpenAI.
+          const textUntilPosition = model.getValueInRange({
+            startLineNumber: position.lineNumber,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column
+          });
+          
+          if (textUntilPosition.trim() === 'function calculateEncryption() {') {
+            return {
+              items: [{
+                insertText: '\n  const vault = new AzureKeyVault();\n  return vault.encrypt("sovereign_data");\n}',
+                range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column)
+              }]
+            };
+          }
+          return { items: [] };
+        },
+      });
+      return () => provider.dispose();
+    }
+  }, [monaco]);
+
   const handleSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && prompt.trim() && !isStreaming) {
       const userMessage = prompt;
       setPrompt('');
-      setIsStreaming(true);
+      setActiveNodes(prev => Math.min(prev + 2, 12));
+
       setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Processing securely...' }]);
+      setIsStreaming(true);
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Activating Azure Composer Engine...' }]);
 
       try {
-        if (activeTab === 'code') {
-          setActiveNodes(prev => Math.min(prev + 5, 50));
-          const payload = `[COMPOSER] ${userMessage}`;
-          await invoke('execute_agent_mission', { missionId: Date.now().toString(), command: payload });
-          
-          setViewMode('diff');
-          setComposerCode(`// Auto-generated by Azure Copilot Composer\n\n${userMessage}\n\nfunction optimized() {\n  return true;\n}`);
-          
-          setMessages(prev => {
-            const newMsg = [...prev];
-            newMsg[newMsg.length - 1].content = "Code diff generated. Please review.";
-            return newMsg;
-          });
-        } 
-        else if (activeTab === 'work') {
-          // Send to White-Collar Engine
-          setMessages(prev => {
-            const newMsg = [...prev];
-            newMsg[newMsg.length - 1].content = `[${professionContext} Agent] Analyzing data and generating Excel structure... Done.`;
-            return newMsg;
-          });
-        }
-        else {
-          // Standard Chat
-          setMessages(prev => {
-            const newMsg = [...prev];
-            newMsg[newMsg.length - 1].content = "This is a conversational response from the Sovereign Azure Enclave.";
-            return newMsg;
-          });
-        }
+        const payload = `[COMPOSER] ${userMessage}`;
+        await invoke('execute_agent_mission', { missionId: Date.now().toString(), command: payload });
+        
+        // Simulating the Composer generating a diff.
+        setViewMode('diff');
+        setComposerCode(`// Auto-generated by Azure Copilot Composer\n\n${userMessage}\n\nfunction calculateEncryption() {\n  const vault = new AzureKeyVault();\n  return vault.encrypt("sovereign_data");\n}`);
+
+        setMessages(prev => {
+          const newMsg = [...prev];
+          newMsg[newMsg.length - 1].content = "Composer generated changes. Review the diff pane.";
+          return newMsg;
+        });
       } catch (err) {
         setMessages(prev => {
           const newMsg = [...prev];
@@ -129,127 +143,114 @@ export default function App() {
   };
 
   return (
-    <div className="layout" style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a0a', color: '#fff' }}>
-      
+    <div className="layout">
       {/* Titlebar */}
-      <div data-tauri-drag-region style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: '#111', borderBottom: '1px solid #333' }}>
-        <div style={{ fontWeight: 'bold', letterSpacing: '2px', color: '#00FF9D' }}>ALTI.CODE.STUDIO</div>
-        
-        {/* The 3 Core Routing Tabs */}
-        <div style={{ display: 'flex', gap: '20px' }}>
-          <button onClick={() => setActiveTab('chat')} style={{ background: activeTab === 'chat' ? '#00FF9D20' : 'transparent', color: activeTab === 'chat' ? '#00FF9D' : '#888', border: '1px solid', borderColor: activeTab === 'chat' ? '#00FF9D' : 'transparent', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' }}>CHAT</button>
-          <button onClick={() => setActiveTab('work')} style={{ background: activeTab === 'work' ? '#00FF9D20' : 'transparent', color: activeTab === 'work' ? '#00FF9D' : '#888', border: '1px solid', borderColor: activeTab === 'work' ? '#00FF9D' : 'transparent', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' }}>WORK</button>
-          <button onClick={() => setActiveTab('code')} style={{ background: activeTab === 'code' ? '#00FF9D20' : 'transparent', color: activeTab === 'code' ? '#00FF9D' : '#888', border: '1px solid', borderColor: activeTab === 'code' ? '#00FF9D' : 'transparent', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' }}>CODE</button>
+      <div data-tauri-drag-region className="titlebar">
+        <div className="titlebar-controls">
+          <div className="control close"></div>
+          <div className="control minimize"></div>
+          <div className="control maximize"></div>
         </div>
 
-        <div style={{ fontSize: '12px', color: '#888' }}>
-          <span style={{ color: '#00FF9D', marginRight: '8px' }}>●</span> AZURE VNET NATIVE
+        <div className="titlebar-title" data-tauri-drag-region>
+          INSO CODE / AZURE COPILOT
+        </div>
+
+        <div className="titlebar-status">
+          <div className={`status-dot ${telemetry?.status === 'flawless' ? 'active' : ''}`}></div>
+          <span className="mono-text">{telemetry?.sovereign_plane || 'INITIALIZING'}</span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        
-        {/* ========================================================= */}
-        {/* TAB 1: CHAT (Standard Conversational)                       */}
-        {/* ========================================================= */}
-        {activeTab === 'chat' && (
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-             <div style={{ width: '800px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '40px', textAlign: 'center', opacity: 0.5 }}>
-                   <h2>Sovereign Chat Engine</h2>
-                   <p>Strictly conversational inference with memory persistence.</p>
-                </div>
-                {/* Messages mapped globally below */}
-             </div>
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* TAB 2: WORK (White Collar - Excel/PDF/PPTX)                 */}
-        {/* ========================================================= */}
-        {activeTab === 'work' && (
-          <div style={{ flex: 1, display: 'flex', padding: '20px', gap: '20px' }}>
-            <div style={{ flex: 1, border: '1px dashed #444', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ color: '#00FF9D', marginBottom: '10px' }}>Domain Persona Configuration</h3>
-              <select 
-                value={professionContext} 
-                onChange={e => setProfessionContext(e.target.value)}
-                style={{ background: '#222', color: '#fff', padding: '10px', border: '1px solid #444', borderRadius: '4px', marginBottom: '20px' }}>
-                <option>Financial Analyst</option>
-                <option>Corporate Lawyer</option>
-                <option>Marketing Executive</option>
-                <option>Supply Chain Manager</option>
-                <option>HR Director</option>
-              </select>
-
-              <h3 style={{ color: '#00FF9D', marginBottom: '10px' }}>Sovereign Document Drop</h3>
-              <div style={{ flex: 1, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
-                Drag & Drop PDFs, .docx, or .xlsx here for local VNet ingestion
-              </div>
-            </div>
-            <div style={{ flex: 1, border: '1px solid #333', borderRadius: '8px', padding: '20px', background: '#111' }}>
-              <h3 style={{ color: '#00FF9D', marginBottom: '10px' }}>Output Canvas</h3>
-              <p style={{ color: '#888', fontSize: '13px' }}>Spreadsheets and Pitch Decks generated by the {professionContext} agent will preview here.</p>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* TAB 3: CODE (Software Engineering Copilot)                  */}
-        {/* ========================================================= */}
-        {activeTab === 'code' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid #333' }}>
-            <div style={{ display: 'flex', background: '#151515', padding: '10px 15px', gap: '10px' }}>
+      <div className="main-container">
+        {/* Editor Area (Monaco) */}
+        <div className="editor-area" style={{ flex: 1, backgroundColor: '#1e1e1e', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
+            <div className="editor-tabs" style={{ display: 'flex', background: '#252526', padding: '10px 15px', gap: '10px' }}>
                 <button 
                   onClick={() => setViewMode('editor')}
-                  style={{ background: viewMode === 'editor' ? '#222' : 'transparent', color: viewMode === 'editor' ? '#fff' : '#888', border: 'none', padding: '5px 10px', borderRadius: '4px' }}>
+                  style={{ background: viewMode === 'editor' ? '#1e1e1e' : 'transparent', color: viewMode === 'editor' ? '#fff' : '#888', border: 'none', padding: '5px 10px', cursor: 'pointer', borderRadius: '4px' }}>
                   main.ts
                 </button>
                 <button 
                   onClick={() => setViewMode('diff')}
-                  style={{ background: viewMode === 'diff' ? '#222' : 'transparent', color: viewMode === 'diff' ? '#00FF9D' : '#888', border: 'none', padding: '5px 10px', borderRadius: '4px' }}>
+                  style={{ background: viewMode === 'diff' ? '#1e1e1e' : 'transparent', color: viewMode === 'diff' ? '#00FF9D' : '#888', border: 'none', padding: '5px 10px', cursor: 'pointer', borderRadius: '4px' }}>
                   Composer Diff
                 </button>
             </div>
             
             {viewMode === 'editor' ? (
-              <Editor height="100%" theme="vs-dark" language="typescript" value={code} onChange={(val) => setCode(val || '')} />
+              <Editor 
+                  height="100%" 
+                  theme="vs-dark" 
+                  language={editorLanguage} 
+                  value={code} 
+                  onChange={(val) => setCode(val || '')} 
+                  options={{
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      fontFamily: "'Geist Mono', 'Fira Code', monospace",
+                      padding: { top: 20 },
+                      inlineSuggest: { enabled: true }
+                  }}
+              />
             ) : (
-              <DiffEditor height="100%" theme="vs-dark" language="typescript" original={code} modified={composerCode} />
+              <DiffEditor 
+                  height="100%" 
+                  theme="vs-dark" 
+                  language={editorLanguage} 
+                  original={code}
+                  modified={composerCode}
+                  options={{
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      fontFamily: "'Geist Mono', 'Fira Code', monospace",
+                      renderSideBySide: true,
+                      readOnly: true
+                  }}
+              />
             )}
-          </div>
-        )}
+        </div>
 
-        {/* ========================================================= */}
-        {/* UNIVERSAL RIGHT SIDEBAR (Agent Command & Telemetry)       */}
-        {/* ========================================================= */}
-        <div style={{ width: '400px', display: 'flex', flexDirection: 'column', background: '#111', borderLeft: '1px solid #333' }}>
-          
-          <div style={{ height: '150px', borderBottom: '1px solid #333' }}>
+        {/* Chat Area */}
+        <main className="chat-area" style={{ flex: '0 0 450px', display: 'flex', flexDirection: 'column' }}>
+          <div className="hologram-container" style={{ height: '180px', flexShrink: 0, borderBottom: '1px solid #2a2a2a' }}>
             <HolographicSwarm activeNodes={activeNodes} />
+            <div className="hologram-overlay">
+              <span className="overlay-text">{`ACTIVE NODES: ${activeNodes}`}</span>
+            </div>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-            {messages.map((msg, i) => (
-              <div key={i} style={{ marginBottom: '15px', background: msg.role === 'user' ? '#222' : '#00FF9D10', padding: '12px', borderRadius: '6px', border: msg.role === 'assistant' ? '1px solid #00FF9D40' : 'none', color: '#ddd', fontSize: '14px' }}>
-                {msg.content}
+          <div className="messages" style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+            {messages.length === 0 ? (
+              <div className="empty-state">
+                <h1 className="serif-title large" style={{ fontSize: '1.5rem', marginBottom: '10px' }}>Azure Copilot</h1>
+                <p className="empty-subtitle">Instruct the Composer. Press Tab for Inline Ghost Text.</p>
               </div>
-            ))}
+            ) : (
+              messages.map((msg, i) => (
+                <div key={i} className={`message-row ${msg.role}`} style={{ marginBottom: '15px' }}>
+                  <div className="message-content" style={{ padding: '10px 14px', borderRadius: '8px', background: msg.role === 'user' ? '#2b2d31' : '#1e1e1e', border: msg.role === 'assistant' ? '1px solid #00FF9D40' : 'none', color: '#e0e0e0', fontSize: '0.9rem', lineHeight: '1.4' }}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))
+            )}
             <div ref={endOfMessagesRef} />
           </div>
 
-          <div style={{ padding: '20px', borderTop: '1px solid #333' }}>
+          <div className="input-area" style={{ padding: '20px', borderTop: '1px solid #2a2a2a' }}>
             <input 
               type="text" 
-              placeholder={`Instruct the ${activeTab.toUpperCase()} Agent...`}
+              className="chat-input" 
+              placeholder="Ask Copilot Composer to rewrite this logic..." 
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleSubmit}
-              style={{ width: '100%', padding: '12px', background: '#222', border: '1px solid #444', borderRadius: '6px', color: '#fff', outline: 'none' }}
+              autoFocus
+              style={{ width: '100%', padding: '12px', background: '#1e1e1e', border: '1px solid #333', borderRadius: '6px', color: '#fff', outline: 'none' }}
             />
           </div>
-
-        </div>
+        </main>
       </div>
     </div>
   );
