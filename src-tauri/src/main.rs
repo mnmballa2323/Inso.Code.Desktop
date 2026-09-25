@@ -55,7 +55,7 @@ async fn initialize_sovereign_azure_openai(state: tauri::State<'_, EdgeCloudEncl
 
     *state.local_ml_engine_ready.lock().unwrap() = true;
 
-    println!("☁️ [Azure-Cloud] Bridging Edge to Azure Azure OpenAI Sovereign Execution Plane...");
+    println!("☁️ [Azure-Cloud] Bridging Edge to Azure OpenAI Sovereign Execution Plane...");
     let endpoint = std::env::var("AZURE_OPENAI_ENDPOINT").unwrap_or_else(|_| "https://sovereign-godnode.openai.azure.com".into());
     let client = AzureOpenAIClient::new(&endpoint);
     *state.azure_openai_client.lock().unwrap() = Some(client);

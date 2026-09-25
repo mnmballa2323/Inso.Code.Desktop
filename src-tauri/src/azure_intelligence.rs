@@ -23,7 +23,7 @@ impl AzureIntelligence {
             endpoint: std::env::var("AZURE_OPENAI_ENDPOINT")
                 .unwrap_or_else(|_| "https://your-resource.openai.azure.com".to_string()),
             deployment: std::env::var("AZURE_OPENAI_DEPLOYMENT")
-                .unwrap_or_else(|_| "gpt-4o".to_string()),
+                .unwrap_or_else(|_| "gpt-6-astra".to_string()),
             client: Client::new(),
         }
     }
