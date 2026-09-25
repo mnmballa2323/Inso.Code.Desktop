@@ -100,7 +100,6 @@ export default function App() {
           }
           return { items: [] };
         },
-        freeInlineCompletions: () => {}
       });
       return () => provider.dispose();
     }
